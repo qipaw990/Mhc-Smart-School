@@ -6,6 +6,17 @@
 
 set -e
 
+# ── Auto-detect docker compose command ─────────────────────
+# Docker v2+ pakai 'docker compose' (spasi), v1 pakai 'docker-compose' (strip)
+if docker compose version &>/dev/null 2>&1; then
+    DOCKER_COMPOSE="docker compose"
+elif command -v docker-compose &>/dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+else
+    echo -e "\033[0;31m❌ Docker Compose tidak ditemukan! Install Docker Desktop atau docker-compose dulu.\033[0m"
+    exit 1
+fi
+
 # ── Colors ─────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -95,11 +106,11 @@ echo -e "${BOLD}[3/7] 🐳 Build & Start Docker Containers...${NC}"
 
 if [ "$IS_FIRST_DEPLOY" = true ] || [ "$CODE_CHANGED" = true ]; then
     echo -e "  🔨 Building images (proses ini ±2-5 menit pertama kali)..."
-    docker-compose up -d --build
+    $DOCKER_COMPOSE up -d --build
     echo -e "  ${GREEN}✅ Containers berhasil dibangun dan dijalankan${NC}"
 else
     echo -e "  ⏭️  Tidak ada perubahan kode, restart container saja..."
-    docker-compose restart smartschool_app smartschool_nginx smartschool_queue
+    $DOCKER_COMPOSE restart smartschool_app smartschool_nginx smartschool_queue
     echo -e "  ${GREEN}✅ Containers di-restart${NC}"
 fi
 
