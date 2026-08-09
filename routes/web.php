@@ -17,6 +17,7 @@ use App\Http\Controllers\P5ProjectController;
 use App\Http\Controllers\ReportCardController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\SchedulerController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SchoolClassController;
 use App\Http\Controllers\SchoolProfileController;
 use App\Http\Controllers\StudentController;
@@ -41,6 +42,11 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // Authenticated Routes
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // User Profile Routes
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'updateProfile'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.update-password');
 
     // Master Data Routes
     Route::prefix('master')->name('master.')->group(function () {

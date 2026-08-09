@@ -901,6 +901,7 @@
                         <div class="small text-muted" style="font-size: 0.72rem;">{{ Auth::user()->primary_role ?? 'Pengguna' }}</div>
                     </li>
                     <li><a class="dropdown-item py-1.5" href="{{ route('dashboard') }}"><i class="fa-solid fa-gauge-high me-2 text-primary"></i> Dashboard</a></li>
+                    <li><a class="dropdown-item py-1.5" href="{{ route('profile.edit') }}"><i class="fa-solid fa-user-pen me-2 text-info"></i> Profil Saya & Keamanan</a></li>
                     @if($isSuperOrAdmin)
                         <li><a class="dropdown-item py-1.5" href="{{ route('master.school.index') }}"><i class="fa-solid fa-gear me-2 text-secondary"></i> Pengaturan Sekolah & Sistem</a></li>
                     @endif
