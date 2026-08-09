@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # ── PHP-FPM Application ──────────────────────────────────────
+  smartschool_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartschool_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - smartschool_storage:/var/www/html/storage
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    environment:
+      - PHP_OPCACHE_ENABLE=1
+    networks:
+      - smartschool_net
+    depends_on:
+      smartschool_db:
+        condition: service_healthy
+
+  # ── Nginx Web Server ─────────────────────────────────────────
+  smartschool_nginx:
+    image: nginx:alpine
+    container_name: smartschool_nginx
+    restart: unless-stopped
+    ports:
+      - "8590:80"
+    volumes:
+      - .:/var/www/html
+      - smartschool_storage:/var/www/html/storage
+      - ./docker/nginx/smartschool.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - smartschool_net
+    depends_on:
+      - smartschool_app
+
+  # ── MySQL Database ───────────────────────────────────────────
+  smartschool_db:
+    image: mysql:8.0
+    container_name: smartschool_db
+    restart: unless-stopped
+    ports:
+      - "33307:3306"
+    environment:
+      MYSQL_DATABASE: smartschool
+      MYSQL_ROOT_PASSWORD: smartschool_root_2026
+      MYSQL_USER: smartschool
+      MYSQL_PASSWORD: smartschool_pass_2026
+    volumes:
+      - smartschool_db_data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-psmartschool_root_2026"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartschool_net
+
+  # ── Queue Worker ─────────────────────────────────────────────
+  smartschool_queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartschool_queue
+    restart: unless-stopped
+    command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - smartschool_storage:/var/www/html/storage
+    networks:
+      - smartschool_net
+    depends_on:
+      smartschool_db:
+        condition: service_healthy
+
+# ── Networks ──────────────────────────────────────────────────
+networks:
+  smartschool_net:
+    driver: bridge
+
+# ── Volumes ───────────────────────────────────────────────────
+volumes:
+  smartschool_db_data:
+    driver: local
+  smartschool_storage:
+    driver: local

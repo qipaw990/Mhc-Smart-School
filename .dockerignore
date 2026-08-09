@@ -1,0 +1,47 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Environment
+.env
+.env.backup
+.env.local
+.env.*.local
+
+# Development tools
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Laravel
+/storage/app/public/*
+/storage/logs/*.log
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/testing/
+/storage/framework/views/*
+/bootstrap/cache/*.php
+
+# Git
+.git/
+.gitignore
+
+# Tests
+/tests/
+
+# Documentation
+*.md
+LICENSE
+
+# Build artifacts
+/public/hot
+/public/storage
+
+# Temp files
+*.tmp
+*.bak
+debug_*.php
+backfill_*.php
