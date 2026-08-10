@@ -42,6 +42,19 @@ class JournalApiController extends Controller
     }
 
     /**
+     * Show Teaching Journal Detail
+     */
+    public function show(TeachingJournal $journal)
+    {
+        $journal->load(['teacher', 'schoolClass', 'subject', 'learningObjective', 'scheduleItem.room']);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $journal,
+        ]);
+    }
+
+    /**
      * Create KBM Journal from Mobile App
      */
     public function store(Request $request)
@@ -54,14 +67,14 @@ class JournalApiController extends Controller
             'materi_pokok'    => 'required|string',
             'kegiatan'        => 'nullable|string',
             'catatan'         => 'nullable|string',
-            'absent_students' => 'nullable|array', // Array of student_ids who are absent/sick/permit
+            'absent_students' => 'nullable|array',
             'absent_students.*.id'     => 'required_with:absent_students|exists:students,id',
             'absent_students.*.status' => 'required_with:absent_students|in:S,I,A,T',
         ], [
-            'date.required'          => 'Tanggal KBM wajib diisi.',
-            'class_id.required'      => 'Kelas wajib dipilih.',
-            'subject_id.required'    => 'Mata pelajaran wajib dipilih.',
-            'materi_pokok.required'  => 'Materi pokok / bahasan wajib diisi.',
+            'date.required'         => 'Tanggal KBM wajib diisi.',
+            'class_id.required'     => 'Kelas wajib dipilih.',
+            'subject_id.required'   => 'Mata pelajaran wajib dipilih.',
+            'materi_pokok.required' => 'Materi pokok / bahasan wajib diisi.',
         ]);
 
         $user      = $request->user();
@@ -77,8 +90,8 @@ class JournalApiController extends Controller
         }
 
         $journal = TeachingJournal::create([
-            'school_id'        => $school->id,
-            'academic_year_id' => $ay->id,
+            'school_id'        => $school?->id,
+            'academic_year_id' => $ay?->id,
             'teacher_id'       => $teacherId,
             'class_id'         => $validated['class_id'],
             'subject_id'       => $validated['subject_id'],
@@ -89,15 +102,14 @@ class JournalApiController extends Controller
             'catatan'          => $validated['catatan'] ?? null,
         ]);
 
-        // Auto-record student attendances if absent_students payload is provided
         if (!empty($validated['absent_students'])) {
             foreach ($validated['absent_students'] as $item) {
                 Attendance::updateOrCreate([
                     'date'       => $validated['date'],
                     'student_id' => $item['id'],
                 ], [
-                    'school_id'        => $school->id,
-                    'academic_year_id' => $ay->id,
+                    'school_id'        => $school?->id,
+                    'academic_year_id' => $ay?->id,
                     'teacher_id'       => $teacherId,
                     'time'             => now()->toTimeString(),
                     'type'             => 'subject_session',
@@ -112,5 +124,18 @@ class JournalApiController extends Controller
             'message' => 'Jurnal Mengajar KBM berhasil disimpan!',
             'data'    => $journal->load(['subject', 'schoolClass']),
         ], 201);
+    }
+
+    /**
+     * Delete Teaching Journal
+     */
+    public function destroy(TeachingJournal $journal)
+    {
+        $journal->delete();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Jurnal mengajar berhasil dihapus.',
+        ]);
     }
 }

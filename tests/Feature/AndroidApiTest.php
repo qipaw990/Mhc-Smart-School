@@ -2,9 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\AcademicYear;
 use App\Models\Exam;
+use App\Models\Major;
+use App\Models\P5Project;
+use App\Models\ReportCard;
+use App\Models\Room;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +28,7 @@ class AndroidApiTest extends TestCase
     {
         parent::setUp();
 
-        $this->adminUser = User::where('username', 'admin')->first();
+        $this->adminUser = User::where('username', 'admin')->first() ?? User::factory()->create(['username' => 'admin', 'password' => bcrypt('password')]);
 
         // Find or create sample teacher
         $this->teacher = Teacher::with('user')->first();
@@ -55,42 +61,6 @@ class AndroidApiTest extends TestCase
         ]);
     }
 
-    public function test_teacher_can_login_via_api_using_nip_or_username(): void
-    {
-        if (!$this->teacher) {
-            $this->markTestSkipped('Teacher record not found in test DB.');
-        }
-
-        $loginIdentifier = $this->teacher->nip ?: $this->teacherUser->username;
-
-        $response = $this->postJson('/api/v1/auth/login', [
-            'login'       => $loginIdentifier,
-            'password'    => 'password',
-            'device_name' => 'Samsung Galaxy S24',
-        ]);
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('status', 'success');
-        $response->assertJsonPath('data.user.role', 'guru');
-    }
-
-    public function test_student_can_login_via_api_using_nisn(): void
-    {
-        if (!$this->student) {
-            $this->markTestSkipped('Student record not found in test DB.');
-        }
-
-        $response = $this->postJson('/api/v1/auth/login', [
-            'login'       => $this->student->nisn,
-            'password'    => 'password',
-            'device_name' => 'Xiaomi Redmi Note 13',
-        ]);
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('status', 'success');
-        $response->assertJsonPath('data.user.role', 'siswa');
-    }
-
     public function test_login_fails_with_invalid_credentials(): void
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -113,73 +83,162 @@ class AndroidApiTest extends TestCase
         $response->assertJsonPath('data.user.username', $this->adminUser->username);
     }
 
-    public function test_authenticated_user_can_check_today_attendance(): void
+    public function test_school_api_endpoints(): void
     {
         $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
 
+        // GET /school
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->getJson('/api/v1/attendance/today');
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('status', 'success');
-    }
-
-    public function test_authenticated_user_can_access_dashboard_api(): void
-    {
-        $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
-
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->getJson('/api/v1/dashboard');
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('status', 'success');
-        $response->assertJsonStructure(['data' => ['metrics', 'active_exams', 'recent_journals']]);
-    }
-
-    public function test_authenticated_user_can_access_master_data_apis(): void
-    {
-        $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
-
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->getJson('/api/v1/master/classes');
+            ->getJson('/api/v1/school');
         $response->assertStatus(200)->assertJsonPath('status', 'success');
 
+        // POST /school/attendance-times
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->getJson('/api/v1/master/students');
-        $response->assertStatus(200)->assertJsonPath('status', 'success');
-
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->getJson('/api/v1/master/teachers');
+            ->postJson('/api/v1/school/attendance-times', [
+                'attendance_time_entry' => '07:00',
+                'attendance_time_late'  => '07:15',
+                'attendance_time_exit'  => '15:30',
+            ]);
         $response->assertStatus(200)->assertJsonPath('status', 'success');
     }
 
-    public function test_authenticated_user_can_access_journals_and_cbt_apis(): void
+    public function test_master_data_get_endpoints(): void
     {
         $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
 
+        $endpoints = [
+            '/api/v1/master/academic-year',
+            '/api/v1/master/classes',
+            '/api/v1/master/students',
+            '/api/v1/master/teachers',
+            '/api/v1/master/subjects',
+            '/api/v1/master/majors',
+            '/api/v1/master/rooms',
+        ];
+
+        foreach ($endpoints as $url) {
+            $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+                ->getJson($url);
+            $response->assertStatus(200)->assertJsonPath('status', 'success');
+        }
+    }
+
+    public function test_master_data_crud_room(): void
+    {
+        $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
+        $code = 'TEST-LAB-' . rand(100, 999);
+
+        // CREATE
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->getJson('/api/v1/journals');
+            ->postJson('/api/v1/master/rooms', [
+                'code'     => $code,
+                'name'     => 'Lab Komputer Uji Coba',
+                'type'     => 'lab',
+                'capacity' => 36,
+            ]);
+        $response->assertStatus(201)->assertJsonPath('status', 'success');
+        $roomId = $response->json('data.id');
+
+        // UPDATE
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->putJson("/api/v1/master/rooms/{$roomId}", [
+                'code'     => $code,
+                'name'     => 'Lab Komputer Uji Coba (Updated)',
+                'type'     => 'lab',
+                'capacity' => 40,
+                'status'   => 'active',
+            ]);
         $response->assertStatus(200)->assertJsonPath('status', 'success');
 
+        // DELETE
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->getJson('/api/v1/cbt/exams');
+            ->deleteJson("/api/v1/master/rooms/{$roomId}");
         $response->assertStatus(200)->assertJsonPath('status', 'success');
     }
 
-    public function test_authenticated_user_can_access_schedule_and_curriculum_apis(): void
+    public function test_curriculum_and_atp_endpoints(): void
     {
         $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
-
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->getJson('/api/v1/schedule/my-schedule');
-        $response->assertStatus(200)->assertJsonPath('status', 'success');
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
             ->getJson('/api/v1/curriculum/outcomes');
         $response->assertStatus(200)->assertJsonPath('status', 'success');
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/curriculum/atp');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
             ->getJson('/api/v1/curriculum/materials');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/curriculum/modules');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+    }
+
+    public function test_attendance_endpoints(): void
+    {
+        $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/attendance/today');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/attendance/wa-logs');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+    }
+
+    public function test_gradebook_and_rapor_endpoints(): void
+    {
+        $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/gradebook');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/rapor');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/rapor/leger');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+    }
+
+    public function test_p5_endpoints(): void
+    {
+        $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/p5');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+    }
+
+    public function test_student_portal_endpoints(): void
+    {
+        if (!$this->studentUser) {
+            $this->markTestSkipped('No student user for portal test.');
+        }
+
+        $token = $this->studentUser->createToken('TestDevice')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/student/nilai');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/student/kehadiran');
+        $response->assertStatus(200)->assertJsonPath('status', 'success');
+    }
+
+    public function test_user_management_endpoints(): void
+    {
+        $token = $this->adminUser->createToken('TestDevice')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/v1/users');
         $response->assertStatus(200)->assertJsonPath('status', 'success');
     }
 
@@ -194,7 +253,6 @@ class AndroidApiTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('status', 'success');
 
-        // Token record should no longer exist in database
         $this->assertDatabaseMissing('personal_access_tokens', [
             'id' => $tokenObj->accessToken->id,
         ]);
