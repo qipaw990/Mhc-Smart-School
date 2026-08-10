@@ -29,6 +29,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
 
+    // ── CORS Preflight - Catch All OPTIONS requests ────────────────
+    Route::options('{any}', function () {
+        return response('', 200);
+    })->where('any', '.*');
+
     // ── Public Auth Endpoints ─────────────────────────────────────
     Route::post('/auth/login', [AuthController::class, 'login']);
 
